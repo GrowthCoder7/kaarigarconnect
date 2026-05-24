@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Udyam Registration - Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+    h2 { color: #1a6b3c; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 13px; color: #444; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background: #1a6b3c; color: white; padding: 10px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
+    .filled { border-color: #1a6b3c !important; background: #f0fff4 !important; }
+  </style>
+</head>
+<body>
+  <h2>🇮🇳 Udyam Registration Portal (Demo)</h2>
+  <form id="udyamForm">
+    <div class="form-group">
+      <label>Owner Name</label>
+      <input id="txtOwnerName" type="text" placeholder="Full name as per Aadhaar" />
+    </div>
+    <div class="form-group">
+      <label>Mobile Number</label>
+      <input id="txtMobile" type="text" placeholder="10-digit mobile" />
+    </div>
+    <div class="form-group">
+      <label>Enterprise Name</label>
+      <input id="txtEnterpriseName" type="text" placeholder="Name of your business" />
+    </div>
+    <div class="form-group">
+      <label>State</label>
+      <select id="ddlState">
+        <option value="">-- Select State --</option>
+        <option>Madhya Pradesh</option>
+        <option>Gujarat</option>
+        <option>Rajasthan</option>
+        <option>Maharashtra</option>
+        <option>Punjab</option>
+        <option>Bihar</option>
+        <option>Uttar Pradesh</option>
+        <option>West Bengal</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>District</label>
+      <input id="ddlDistrict" type="text" placeholder="District" />
+    </div>
+    <div class="form-group">
+      <label>Address</label>
+      <input id="txtAddress" type="text" placeholder="Full address" />
+    </div>
+    <div class="form-group">
+      <label>PIN Code</label>
+      <input id="txtPinCode" type="text" placeholder="6-digit PIN" />
+    </div>
+    <div class="form-group">
+      <label>NIC Code</label>
+      <input id="txtNICCode" type="text" placeholder="National Industry Classification code" />
+    </div>
+    <div class="form-group">
+      <label>Persons Employed</label>
+      <input id="txtPersonsEmployed" type="number" placeholder="Number of employees" />
+    </div>
+    <div class="form-group">
+      <label>Annual Turnover (₹)</label>
+      <input id="txtTurnover" type="number" placeholder="Annual turnover in rupees" />
+    </div>
+    <button type="button" id="btnSubmit">Submit Registration</button>
+  </form>
+  <div id="successMsg" style="display:none; margin-top:20px; padding:16px; background:#f0fff4; border:1px solid #1a6b3c; border-radius:4px;">
+    ✅ <strong>Registration Submitted Successfully!</strong><br/>
+    Your Udyam Registration Number: <strong>UDYAM-MP-12-0012345</strong>
+  </div>
+  <script>
+    document.getElementById('btnSubmit').onclick = function() {
+      document.getElementById('udyamForm').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
