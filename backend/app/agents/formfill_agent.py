@@ -3,7 +3,7 @@ import google.generativeai as genai
 from app.core.config import settings
 
 genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 EXTRACTION_PROMPT = """
 You are a data extraction agent for an Indian government form filling system.
@@ -48,7 +48,13 @@ async def extract_form_data(profile: dict) -> dict:
     """Extract structured Udyam form data from artisan profile."""
     try:
         prompt = EXTRACTION_PROMPT.format(profile=json.dumps(profile, indent=2))
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=1000,
+            ),
+            request_options={"timeout": 30}
+        )
         text = response.text.strip()
         
         # Strip markdown if model adds it

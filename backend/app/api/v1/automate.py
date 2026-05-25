@@ -1,22 +1,23 @@
 import asyncio
 import json
 import uuid
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+import platform
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
 
 from app.agents.formfill_agent import extract_form_data
 from app.workers.playwright_worker import fill_udyam_form, replay_mock_events
-from app.core.config import settings
-
-from fastapi import UploadFile, File, Form
 from app.workers.ocr_worker import extract_from_image, flatten_ocr_result
 from app.agents.cataloguing_agent import catalogue_product
+from app.core.config import settings
+from app.core.redis_client import (
+    set_job, get_job, update_job,
+    append_event, get_events,
+    set_image_bytes, get_image_bytes
+)
 
 router = APIRouter(prefix="/automate", tags=["automation"])
-
-# In-memory job store (Redis in production)
-_jobs: dict = {}
 
 
 # ── DTOs ──────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@ _jobs: dict = {}
 class FormFillRequest(BaseModel):
     artisan_id: str
     scheme_id: str
-    profile: dict           # raw artisan profile from onboarding
+    profile: dict
     demo_mode: bool = True
 
 class FormFillResponse(BaseModel):
@@ -33,83 +34,66 @@ class FormFillResponse(BaseModel):
     status: str = "queued"
 
 
-# ── REST: Start a form-fill job ────────────────────────────────────────
+# ── Form fill: start ──────────────────────────────────────────────────
 
 @router.post("/start", response_model=FormFillResponse)
 async def start_form_fill(req: FormFillRequest):
-    """
-    1. Extract structured form data from artisan profile via Gemini
-    2. Create a job
-    3. Return job_id + ws_channel for frontend to connect
-    """
-    job_id = str(uuid.uuid4())
+    job_id     = str(uuid.uuid4())
     ws_channel = f"playwright_{job_id}"
+    form_data  = await extract_form_data(req.profile)
 
-    # Extract form data immediately (fast, ~1-2s)
-    form_data = await extract_form_data(req.profile)
-
-    _jobs[job_id] = {
-        "status": "ready",
-        "form_data": form_data,
-        "scheme_id": req.scheme_id,
+    set_job(job_id, {
+        "status":     "ready",
+        "form_data":  form_data,
+        "scheme_id":  req.scheme_id,
         "artisan_id": req.artisan_id,
-        "demo_mode": req.demo_mode,
+        "demo_mode":  req.demo_mode,
         "ws_channel": ws_channel,
-        "events": []
-    }
+    })
 
-    return FormFillResponse(
-        job_id=job_id,
-        ws_channel=ws_channel
-    )
+    return FormFillResponse(job_id=job_id, ws_channel=ws_channel)
 
+
+# ── Form fill: status poll ────────────────────────────────────────────
 
 @router.get("/{job_id}")
 async def get_job_status(job_id: str):
-    """Poll job status — used as fallback if WebSocket disconnects."""
-    job = _jobs.get(job_id)
+    job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {
         "success": True,
         "data": {
             "job_id": job_id,
-            "status": job["status"],
-            "events": job["events"]
+            "status": job.get("status"),
+            "events": get_events(job_id)
         }
     }
 
 
-# ── WebSocket: Stream form-fill events ────────────────────────────────
+# ── Form fill: WebSocket stream ───────────────────────────────────────
 
 @router.websocket("/ws/playwright/{job_id}")
 async def playwright_stream(websocket: WebSocket, job_id: str):
-    """
-    Frontend connects here after calling /start.
-    Triggers Playwright worker and streams events in real time.
-    """
     await websocket.accept()
 
-    job = _jobs.get(job_id)
+    job = get_job(job_id)
     if not job:
         await websocket.send_json({"type": "FATAL_ERROR", "message": "Job not found"})
         await websocket.close()
         return
 
-    _jobs[job_id]["status"] = "running"
+    update_job(job_id, {"status": "running"})
 
     async def emit(event: dict):
-        """Send event to WebSocket + store in job history."""
-        _jobs[job_id]["events"].append(event)
+        append_event(job_id, event)
         try:
             await websocket.send_json(event)
         except Exception:
-            pass  # Client disconnected — keep running, events stored
+            pass
 
     try:
-        import platform
         use_mock = settings.demo_mode or job["demo_mode"] or platform.system() == "Windows"
-
         if use_mock:
             await replay_mock_events(emit)
         else:
@@ -118,11 +102,11 @@ async def playwright_stream(websocket: WebSocket, job_id: str):
                 emit=emit,
                 demo_mode=False
             )
-        _jobs[job_id]["status"] = "complete"
+        update_job(job_id, {"status": "complete"})
 
     except Exception as e:
-        _jobs[job_id]["status"] = "failed"
-        await emit({"type": "FATAL_ERROR", "message": str(e), "timestamp": ""})
+        update_job(job_id, {"status": "failed"})
+        await emit({"type": "FATAL_ERROR", "message": str(e)})
 
     finally:
         try:
@@ -130,82 +114,74 @@ async def playwright_stream(websocket: WebSocket, job_id: str):
         except Exception:
             pass
 
-# ── OCR endpoint ──────────────────────────────────────────────────────
+
+# ── OCR ───────────────────────────────────────────────────────────────
 
 @router.post("/ocr")
 async def ocr_document(
     file: UploadFile = File(...),
     doc_type: str = Form(default="aadhaar")
 ):
-    """Upload document image → get structured extracted data."""
     image_bytes = await file.read()
     result = await extract_from_image(image_bytes, doc_type)
     flat   = flatten_ocr_result(result)
-    return {
-        "success": True,
-        "data": {
-            "extracted": result,
-            "flat":      flat       # ready for form injection
-        }
-    }
+    return {"success": True, "data": {"extracted": result, "flat": flat}}
 
 
-# ── Catalogue start endpoint ──────────────────────────────────────────
-
-class CatalogueRequest(BaseModel):
-    artisan_id: str
-    artisan_profile: dict
-    material_cost: float = 0
-    hours_spent: float = 0
+# ── Catalogue: start ──────────────────────────────────────────────────
 
 @router.post("/catalogue/start")
 async def start_catalogue(
-    file: UploadFile = File(...),
-    artisan_id: str = Form(...),
-    artisan_profile: str = Form(...),   # JSON string
-    material_cost: float = Form(0),
-    hours_spent: float = Form(0)
+    file: UploadFile        = File(...),
+    artisan_id: str         = Form(...),
+    artisan_profile: str    = Form(...),
+    material_cost: float    = Form(0),
+    hours_spent: float      = Form(0)
 ):
-    """Upload product image → returns job_id + ws_channel."""
-    job_id     = str(uuid.uuid4())
-    ws_channel = f"catalogue_{job_id}"
-    profile    = json.loads(artisan_profile)
-
+    job_id      = str(uuid.uuid4())
+    ws_channel  = f"catalogue_{job_id}"
+    profile     = json.loads(artisan_profile)
     image_bytes = await file.read()
 
-    _jobs[job_id] = {
+    # Store image bytes separately (not JSON serializable)
+    set_image_bytes(job_id, image_bytes)
+
+    set_job(job_id, {
         "type":          "catalogue",
         "status":        "ready",
-        "image_bytes":   image_bytes,
         "artisan_id":    artisan_id,
         "profile":       profile,
         "material_cost": material_cost,
         "hours_spent":   hours_spent,
         "ws_channel":    ws_channel,
         "result":        None,
-        "events":        []
-    }
+    })
 
     return {"success": True, "data": {"job_id": job_id, "ws_channel": ws_channel}}
 
 
-# ── Catalogue WebSocket stream ────────────────────────────────────────
+# ── Catalogue: WebSocket stream ───────────────────────────────────────
 
 @router.websocket("/ws/catalogue/{job_id}")
 async def catalogue_stream(websocket: WebSocket, job_id: str):
-    """Frontend connects → triggers Vision analysis → streams CatalogueEvents."""
     await websocket.accept()
 
-    job = _jobs.get(job_id)
+    job = get_job(job_id)
     if not job:
         await websocket.send_json({"type": "ERROR", "payload": {"message": "Job not found"}})
         await websocket.close()
         return
 
-    _jobs[job_id]["status"] = "running"
+    image_bytes = get_image_bytes(job_id)
+    if not image_bytes:
+        await websocket.send_json({"type": "ERROR", "payload": {"message": "Image not found"}})
+        await websocket.close()
+        return
+
+    update_job(job_id, {"status": "running"})
 
     async def emit(event: dict):
-        _jobs[job_id]["events"].append(event)
+        append_event(job_id, event)
         try:
             await websocket.send_json(event)
         except Exception:
@@ -213,17 +189,16 @@ async def catalogue_stream(websocket: WebSocket, job_id: str):
 
     try:
         result = await catalogue_product(
-            image_bytes=job["image_bytes"],
+            image_bytes=image_bytes,
             artisan_profile=job["profile"],
             emit=emit,
             material_cost=job["material_cost"],
             hours_spent=job["hours_spent"]
         )
-        _jobs[job_id]["result"] = result
-        _jobs[job_id]["status"] = "complete"
+        update_job(job_id, {"status": "complete", "result": result})
 
     except Exception as e:
-        _jobs[job_id]["status"] = "failed"
+        update_job(job_id, {"status": "failed"})
         await emit({"type": "ERROR", "payload": {"message": str(e)}})
 
     finally:

@@ -8,7 +8,7 @@ from app.core.config import settings
 
 pytesseract.pytesseract.tesseract_cmd = settings.tesseract_path
 genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 EXTRACTION_PROMPT = """
 You are a document data extraction agent.
@@ -57,7 +57,13 @@ async def extract_from_image(
             doc_type=doc_type,
             ocr_text=raw_text[:2000]  # cap tokens
         )
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=1000,
+            ),
+            request_options={"timeout": 30}
+        )
         text = response.text.strip()
 
         # Strip markdown fences

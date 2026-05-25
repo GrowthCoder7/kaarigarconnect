@@ -8,7 +8,7 @@ from io import BytesIO
 from app.core.config import settings
 
 genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
+model = genai.GenerativeModel("gemini-2.5-flash-image")
 
 # Static GI tag lookup — extend this JSON
 GI_TAGS = {
@@ -90,7 +90,7 @@ async def catalogue_product(
 
         # Step 1: Gemini Vision analysis
         image = Image.open(BytesIO(image_bytes))
-        response = model.generate_content([CATALOGUE_PROMPT, image])
+        response = model.generate_content([CATALOGUE_PROMPT, image],generation_config=genai.GenerationConfig(max_output_tokens=1000),request_options={"timeout":30})
         text = response.text.strip()
 
         if text.startswith("```"):
