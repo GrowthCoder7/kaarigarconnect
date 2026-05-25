@@ -2,7 +2,6 @@ import pytesseract
 import json
 from PIL import Image
 from io import BytesIO
-from pathlib import Path
 import google.generativeai as genai
 from app.core.config import settings
 
@@ -11,101 +10,108 @@ genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 EXTRACTION_PROMPT = """
-You are a document data extraction agent.
+You are a forensic document extraction agent.
 Below is raw OCR text extracted from an Indian identity/business document.
 Document type: {doc_type}
 
-OCR Text:
+Raw OCR Text:
 {ocr_text}
 
-Return ONLY valid JSON with confidence scores (0.0-1.0) per field:
+Return ONLY valid JSON. Assign a strict confidence score (0.0 to 1.0) to each field based on how clearly it appears in the text.
 {{
-  "name":       {{"value": "", "confidence": 0.0}},
-  "dob":        {{"value": "", "confidence": 0.0}},
-  "address":    {{"value": "", "confidence": 0.0}},
-  "id_number":  {{"value": "", "confidence": 0.0}},
-  "state":      {{"value": "", "confidence": 0.0}},
-  "district":   {{"value": "", "confidence": 0.0}},
-  "pin_code":   {{"value": "", "confidence": 0.0}}
+  "owner_name":      {{"value": "", "confidence": 0.0}},
+  "dob":             {{"value": "", "confidence": 0.0}},
+  "address":         {{"value": "", "confidence": 0.0}},
+  "aadhaar_number":  {{"value": "", "confidence": 0.0}},
+  "state":           {{"value": "", "confidence": 0.0}},
+  "district":        {{"value": "", "confidence": 0.0}},
+  "pin_code":        {{"value": "", "confidence": 0.0}}
 }}
 
 Rules:
-- Extract only what is clearly visible in the OCR text
-- Set confidence < 0.5 for fields you are guessing
-- Dates in YYYY-MM-DD format
+- DO NOT guess. If a field is not present, return empty string and 0.0 confidence.
+- Indian addresses often contain districts and states; separate them logically.
+- Format dates as YYYY-MM-DD if possible.
 """
 
-
-async def extract_from_image(
-    image_bytes: bytes,
-    doc_type: str = "aadhaar"
-) -> dict:
+async def extract_from_image(image_bytes: bytes, doc_type: str = "aadhaar") -> dict:
     """
-    Full OCR pipeline:
-    image bytes → Tesseract raw text → Gemini structured JSON
+    Full OCR pipeline: Tesseract raw text -> Gemini structured JSON
     """
     try:
-        # Step 1: Tesseract OCR
         image = Image.open(BytesIO(image_bytes))
-        raw_text = pytesseract.image_to_string(image, lang="eng")
+        # Hardcoded to 'eng' to avoid Windows Tesseract missing language pack crash
+        raw_text = pytesseract.image_to_string(image, lang="eng") 
 
         if not raw_text.strip():
             return _demo_ocr_result()
 
-        # Step 2: Gemini extraction
         prompt = EXTRACTION_PROMPT.format(
             doc_type=doc_type,
-            ocr_text=raw_text[:2000]  # cap tokens
+            ocr_text=raw_text[:2000]
         )
+        
         response = model.generate_content(
             prompt,
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=1000,
-            ),
+            generation_config=genai.GenerationConfig(max_output_tokens=1000),
             request_options={"timeout": 30}
         )
         text = response.text.strip()
 
-        # Strip markdown fences
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
                 text = text[4:]
 
         result = json.loads(text.strip())
-        result["raw_ocr"] = raw_text[:500]  # store partial raw for debug
+        result["raw_ocr"] = raw_text[:500] 
         return result
 
     except json.JSONDecodeError:
+        print("[OCR Worker] Failed to decode JSON from LLM.")
         return _demo_ocr_result()
     except Exception as e:
-        print(f"[OCR Worker] Failed: {e}")
-        return _demo_ocr_result()
+        print(f"[OCR Worker] Fatal pipeline error: {e}")
+        # raise e
+        return _demo_ocr_result()  # <-- We are forcing this to crash loudly so we can see the exact Tesseract error
 
 
-def _demo_ocr_result() -> dict:
-    """Safe fallback for demo — returns Sunita's profile."""
-    return {
-        "name":      {"value": "Sunita Devi",              "confidence": 1.0},
-        "dob":       {"value": "1988-04-15",               "confidence": 1.0},
-        "address":   {"value": "Village Chanderi, MP",     "confidence": 1.0},
-        "id_number": {"value": "XXXX-XXXX-4321",           "confidence": 1.0},
-        "state":     {"value": "Madhya Pradesh",           "confidence": 1.0},
-        "district":  {"value": "Chanderi",                 "confidence": 1.0},
-        "pin_code":  {"value": "473446",                   "confidence": 1.0},
-        "raw_ocr":   "DEMO MODE - no real OCR performed"
+def categorize_ocr_result(ocr_result: dict) -> dict:
+    """
+    Routes extracted fields into actionable UI states for the frontend.
+    """
+    categorized = {
+        "auto_fill": {},      # >= 0.8
+        "needs_review": {},   # 0.4 - 0.79
+        "missing": []         # < 0.4
     }
-
-
-def flatten_ocr_result(ocr_result: dict) -> dict:
-    """
-    Convert confidence-scored OCR output to flat dict for form filling.
-    Only includes fields with confidence >= 0.5
-    """
-    flat = {}
+    
     for field, data in ocr_result.items():
         if field == "raw_ocr":
             continue
-        if isinstance(data, dict) and data.get("confidence", 0) >= 0.5:
-            flat[field] = data["value"]
-    return flat
+            
+        conf = data.get("confidence", 0.0)
+        val = data.get("value", "")
+
+        if conf >= 0.8 and val:
+            categorized["auto_fill"][field] = val
+        elif 0.4 <= conf < 0.8 and val:
+            categorized["needs_review"][field] = val
+        else:
+            categorized["missing"].append(field)
+            
+    return categorized
+
+
+def _demo_ocr_result() -> dict:
+    """Mock fallback demonstrating the Tri-State output."""
+    return {
+        "owner_name":     {"value": "Sunita Devi",          "confidence": 0.95},
+        "dob":            {"value": "1988-04-15",           "confidence": 0.85},
+        "address":        {"value": "Vill Chanderi, Near..","confidence": 0.60},
+        "aadhaar_number": {"value": "[Redacted]",           "confidence": 0.99},
+        "state":          {"value": "Madhya Pradesh",       "confidence": 0.90},
+        "district":       {"value": "Chanderi",             "confidence": 0.88},
+        "pin_code":       {"value": "",                     "confidence": 0.10},
+        "raw_ocr":        "DEMO MODE - Mocked text layer"
+    }

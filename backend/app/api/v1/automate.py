@@ -8,7 +8,7 @@ from typing import Optional
 
 from app.agents.formfill_agent import extract_form_data
 from app.workers.playwright_worker import fill_udyam_form, replay_mock_events
-from app.workers.ocr_worker import extract_from_image, flatten_ocr_result
+from app.workers.ocr_worker import extract_from_image, categorize_ocr_result
 from app.agents.cataloguing_agent import catalogue_product
 from app.core.config import settings
 from app.core.redis_client import (
@@ -124,8 +124,17 @@ async def ocr_document(
 ):
     image_bytes = await file.read()
     result = await extract_from_image(image_bytes, doc_type)
-    flat   = flatten_ocr_result(result)
-    return {"success": True, "data": {"extracted": result, "flat": flat}}
+    
+    # Tri-state categorization for the frontend
+    categorized = categorize_ocr_result(result)
+    
+    return {
+        "success": True, 
+        "data": {
+            "raw_extracted": result, 
+            "categorized": categorized
+        }
+    }
 
 
 # ── Catalogue: start ──────────────────────────────────────────────────
