@@ -1,81 +1,760 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Udyam Registration - Demo</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Udyam Registration | Government of India</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
-    h2 { color: #1a6b3c; }
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 13px; color: #444; }
-    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    button { background: #1a6b3c; color: white; padding: 10px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
-    .filled { border-color: #1a6b3c !important; background: #f0fff4 !important; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gov-blue:    #003580;
+      --gov-orange:  #FF6200;
+      --gov-green:   #138808;
+      --gov-light:   #f5f5f5;
+      --gov-border:  #c8c8c8;
+      --gov-text:    #212121;
+      --gov-muted:   #555;
+      --filled-bg:   #e8f5e9;
+      --filled-border:#2e7d32;
+      --error-bg:    #ffebee;
+      --error-border:#c62828;
+    }
+
+    body {
+      font-family: 'Noto Sans', Arial, sans-serif;
+      background: #e8ecf0;
+      color: var(--gov-text);
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── TOP HEADER ── */
+    .top-bar {
+      background: var(--gov-blue);
+      color: white;
+      font-size: 11px;
+      padding: 4px 0;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+    .top-bar a { color: #aad4ff; text-decoration: none; margin: 0 8px; }
+
+    .gov-header {
+      background: white;
+      border-bottom: 3px solid var(--gov-orange);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .emblem { width: 56px; height: 56px; }
+    .emblem img { width: 100%; }
+    .gov-title h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--gov-blue);
+      line-height: 1.2;
+    }
+    .gov-title h2 {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--gov-muted);
+    }
+    .ministry-badge {
+      margin-left: auto;
+      text-align: right;
+      font-size: 11px;
+      color: var(--gov-muted);
+      line-height: 1.6;
+    }
+    .ministry-badge strong { color: var(--gov-blue); font-size: 12px; }
+
+    /* ── NAV BAR ── */
+    .nav-bar {
+      background: var(--gov-blue);
+      display: flex;
+      gap: 0;
+    }
+    .nav-bar a {
+      color: #cde;
+      text-decoration: none;
+      padding: 9px 18px;
+      font-size: 12px;
+      font-weight: 500;
+      border-right: 1px solid rgba(255,255,255,0.1);
+      transition: background 0.15s;
+    }
+    .nav-bar a:hover, .nav-bar a.active { background: var(--gov-orange); color: white; }
+
+    /* ── NOTICE STRIP ── */
+    .notice-strip {
+      background: #fffde7;
+      border-bottom: 1px solid #f9a825;
+      padding: 6px 24px;
+      font-size: 11.5px;
+      color: #5d4037;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .notice-strip .ticker {
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .blink { animation: blink 1s step-end infinite; color: #c62828; font-weight: 700; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── MAIN LAYOUT ── */
+    .main-wrap {
+      display: flex;
+      gap: 0;
+      max-width: 1100px;
+      margin: 16px auto;
+      padding: 0 12px;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+    }
+    .sidebar-box {
+      background: white;
+      border: 1px solid var(--gov-border);
+      border-top: 3px solid var(--gov-blue);
+      margin-bottom: 12px;
+    }
+    .sidebar-box h4 {
+      background: var(--gov-blue);
+      color: white;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .sidebar-box ul { list-style: none; }
+    .sidebar-box ul li a {
+      display: block;
+      padding: 7px 12px;
+      font-size: 12px;
+      color: var(--gov-blue);
+      text-decoration: none;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .sidebar-box ul li a:hover { background: #eaf2ff; }
+    .sidebar-box ul li.active a {
+      background: #eaf2ff;
+      font-weight: 600;
+      border-left: 3px solid var(--gov-orange);
+    }
+
+    /* ── FORM PANEL ── */
+    .form-panel {
+      flex: 1;
+      margin-left: 14px;
+    }
+
+    .panel-header {
+      background: var(--gov-blue);
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-header h3 { font-size: 14px; font-weight: 600; }
+    .panel-header .step-badge {
+      background: var(--gov-orange);
+      color: white;
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 2px;
+    }
+
+    .form-card {
+      background: white;
+      border: 1px solid var(--gov-border);
+      border-top: none;
+      padding: 20px;
+    }
+
+    /* ── FORM SECTIONS ── */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gov-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 0 6px;
+      border-bottom: 1px solid var(--gov-border);
+      margin: 18px 0 14px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 20px;
+      margin-bottom: 12px;
+    }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-row.full  { grid-template-columns: 1fr; }
+
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--gov-muted);
+      margin-bottom: 4px;
+    }
+    .form-group label .req { color: #c62828; margin-left: 2px; }
+
+    .form-group input,
+    .form-group select {
+      padding: 7px 10px;
+      border: 1px solid var(--gov-border);
+      border-radius: 2px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--gov-text);
+      background: white;
+      transition: border-color 0.2s, background 0.2s;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--gov-blue);
+      box-shadow: 0 0 0 2px rgba(0,53,128,0.1);
+    }
+    .form-group input.filled,
+    .form-group select.filled {
+      border-color: var(--filled-border);
+      background: var(--filled-bg);
+      color: #1b5e20;
+      font-weight: 500;
+    }
+    .form-group input.typing {
+      border-color: var(--gov-orange);
+      background: #fff8f0;
+    }
+    .form-group input.error,
+    .form-group select.error {
+      border-color: var(--error-border);
+      background: var(--error-bg);
+    }
+
+    /* ── FIELD STATUS INDICATORS ── */
+    .field-wrap { position: relative; }
+    .field-indicator {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .field-indicator.show { opacity: 1; }
+
+    /* ── SUBMIT AREA ── */
+    .submit-area {
+      border-top: 1px solid var(--gov-border);
+      padding: 16px 0 0;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .declaration {
+      font-size: 11px;
+      color: var(--gov-muted);
+      line-height: 1.5;
+      flex: 1;
+    }
+    .declaration input[type=checkbox] { margin-right: 5px; }
+
+    .btn-submit {
+      background: var(--gov-blue);
+      color: white;
+      border: none;
+      padding: 10px 28px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 2px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-submit:hover { background: #002060; }
+    .btn-reset {
+      background: white;
+      color: var(--gov-muted);
+      border: 1px solid var(--gov-border);
+      padding: 10px 20px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap {
+      background: #e0e0e0;
+      height: 4px;
+      border-radius: 0;
+      overflow: hidden;
+      margin-bottom: 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--gov-green);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* ── SUCCESS PANEL ── */
+    .success-panel {
+      display: none;
+      background: white;
+      border: 1px solid var(--gov-border);
+      border-top: 4px solid var(--gov-green);
+      padding: 32px;
+      text-align: center;
+    }
+    .success-panel.show { display: block; }
+    .success-icon { font-size: 48px; margin-bottom: 12px; }
+    .success-panel h3 { font-size: 18px; color: var(--gov-green); margin-bottom: 8px; }
+    .udyam-number {
+      display: inline-block;
+      background: #e8f5e9;
+      border: 2px solid var(--gov-green);
+      color: var(--gov-green);
+      font-size: 20px;
+      font-weight: 700;
+      padding: 10px 28px;
+      border-radius: 4px;
+      margin: 12px 0;
+      letter-spacing: 2px;
+    }
+    .cert-download {
+      display: inline-block;
+      margin-top: 16px;
+      background: var(--gov-orange);
+      color: white;
+      padding: 10px 24px;
+      border-radius: 2px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* ── FOOTER ── */
+    .gov-footer {
+      background: var(--gov-blue);
+      color: #aac;
+      text-align: center;
+      padding: 14px;
+      font-size: 11px;
+      margin-top: 20px;
+    }
+    .gov-footer a { color: #aad4ff; }
+
+    /* ── FIELD HIGHLIGHT ANIMATION ── */
+    @keyframes pulse-field {
+      0%   { box-shadow: 0 0 0 0 rgba(255,98,0,0.4); }
+      70%  { box-shadow: 0 0 0 6px rgba(255,98,0,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,98,0,0); }
+    }
+    .field-active { animation: pulse-field 0.8s ease-out; }
   </style>
 </head>
 <body>
-  <h2>🇮🇳 Udyam Registration Portal (Demo)</h2>
-  <form id="udyamForm">
-    <div class="form-group">
-      <label>Owner Name</label>
-      <input id="txtOwnerName" type="text" placeholder="Full name as per Aadhaar" />
-    </div>
-    <div class="form-group">
-      <label>Mobile Number</label>
-      <input id="txtMobile" type="text" placeholder="10-digit mobile" />
-    </div>
-    <div class="form-group">
-      <label>Enterprise Name</label>
-      <input id="txtEnterpriseName" type="text" placeholder="Name of your business" />
-    </div>
-    <div class="form-group">
-      <label>State</label>
-      <select id="ddlState">
-        <option value="">-- Select State --</option>
-        <option>Madhya Pradesh</option>
-        <option>Gujarat</option>
-        <option>Rajasthan</option>
-        <option>Maharashtra</option>
-        <option>Punjab</option>
-        <option>Bihar</option>
-        <option>Uttar Pradesh</option>
-        <option>West Bengal</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>District</label>
-      <input id="ddlDistrict" type="text" placeholder="District" />
-    </div>
-    <div class="form-group">
-      <label>Address</label>
-      <input id="txtAddress" type="text" placeholder="Full address" />
-    </div>
-    <div class="form-group">
-      <label>PIN Code</label>
-      <input id="txtPinCode" type="text" placeholder="6-digit PIN" />
-    </div>
-    <div class="form-group">
-      <label>NIC Code</label>
-      <input id="txtNICCode" type="text" placeholder="National Industry Classification code" />
-    </div>
-    <div class="form-group">
-      <label>Persons Employed</label>
-      <input id="txtPersonsEmployed" type="number" placeholder="Number of employees" />
-    </div>
-    <div class="form-group">
-      <label>Annual Turnover (₹)</label>
-      <input id="txtTurnover" type="number" placeholder="Annual turnover in rupees" />
-    </div>
-    <button type="button" id="btnSubmit">Submit Registration</button>
-  </form>
-  <div id="successMsg" style="display:none; margin-top:20px; padding:16px; background:#f0fff4; border:1px solid #1a6b3c; border-radius:4px;">
-    ✅ <strong>Registration Submitted Successfully!</strong><br/>
-    Your Udyam Registration Number: <strong>UDYAM-MP-12-0012345</strong>
+
+<div class="top-bar">
+  Skip to Main Content &nbsp;|&nbsp;
+  <a href="#">Screen Reader Access</a> &nbsp;|&nbsp;
+  <a href="#">A-</a> <a href="#">A</a> <a href="#">A+</a> &nbsp;|&nbsp;
+  <a href="#">English</a> | <a href="#">हिन्दी</a>
+</div>
+
+<header class="gov-header">
+  <!-- Government emblem via SVG placeholder -->
+  <div class="emblem">
+    <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="28" r="27" fill="#003580" stroke="#f5a623" stroke-width="2"/>
+      <circle cx="28" cy="28" r="18" fill="none" stroke="#f5a623" stroke-width="1.5"/>
+      <text x="28" y="32" text-anchor="middle" fill="#f5a623" font-size="10" font-weight="bold">🦁</text>
+      <text x="28" y="46" text-anchor="middle" fill="#f5a623" font-size="5.5" letter-spacing="0.5">सत्यमेव जयते</text>
+    </svg>
   </div>
-  <script>
-    document.getElementById('btnSubmit').onclick = function() {
-      document.getElementById('udyamForm').style.display = 'none';
-      document.getElementById('successMsg').style.display = 'block';
+  <div class="gov-title">
+    <h1>Udyam Registration Portal</h1>
+    <h2>Ministry of Micro, Small & Medium Enterprises | Government of India</h2>
+  </div>
+  <div class="ministry-badge">
+    <strong>Ministry of MSME</strong><br/>
+    Government of India<br/>
+    udyamregistration.gov.in
+  </div>
+</header>
+
+<nav class="nav-bar">
+  <a href="#" class="active">Register New Enterprise</a>
+  <a href="#">Update Udyam</a>
+  <a href="#">Print Certificate</a>
+  <a href="#">Verify Certificate</a>
+  <a href="#">Helpdesk</a>
+  <a href="#">FAQs</a>
+</nav>
+
+<div class="notice-strip">
+  <span class="blink">NEW</span>
+  <span class="ticker">MSME Classification limits revised w.e.f. 01.04.2025 &nbsp;|&nbsp; Registration is FREE of cost &nbsp;|&nbsp; No documentation required — self-declaration only &nbsp;|&nbsp; Aadhaar-based OTP verification mandatory</span>
+</div>
+
+<div class="main-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-box">
+      <h4>Registration Steps</h4>
+      <ul>
+        <li class="active"><a href="#">1. Personal & Business Details</a></li>
+        <li><a href="#">2. Activity & NIC Code</a></li>
+        <li><a href="#">3. Bank & Investment Details</a></li>
+        <li><a href="#">4. Submit & Get Certificate</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-box">
+      <h4>Quick Links</h4>
+      <ul>
+        <li><a href="#">NIC Code Search</a></li>
+        <li><a href="#">List of Documents</a></li>
+        <li><a href="#">Scheme Benefits</a></li>
+        <li><a href="#">Contact Helpdesk</a></li>
+        <li><a href="#">Download Brochure</a></li>
+      </ul>
+    </div>
+    <div class="sidebar-box">
+      <h4>Helpline</h4>
+      <ul>
+        <li><a href="#">📞 1800-11-4000</a></li>
+        <li><a href="#">📧 champions@gov.in</a></li>
+        <li><a href="#">💬 Live Chat</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- FORM PANEL -->
+  <main class="form-panel">
+
+    <div class="panel-header">
+      <h3>New Udyam Registration — Form for New Enterprises Not Yet Registered as MSME</h3>
+      <span class="step-badge">Step 1 of 4</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="form-card" id="formCard">
+
+      <!-- SECTION 1: Owner Details -->
+      <div class="section-title">A. Proprietor / Owner Details</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Owner Name (as per Aadhaar) <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtOwnerName" type="text" placeholder="Enter full name" autocomplete="off"/>
+            <span class="field-indicator" id="ind_owner_name"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mobile Number <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtMobile" type="text" placeholder="10-digit mobile number" maxlength="10"/>
+            <span class="field-indicator" id="ind_mobile"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row three">
+        <div class="form-group">
+          <label>Gender <span class="req">*</span></label>
+          <select id="ddlGender">
+            <option value="">-- Select --</option>
+            <option value="Female" selected>Female</option>
+            <option value="Male">Male</option>
+            <option value="Transgender">Transgender</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Social Category</label>
+          <select id="ddlSocialCategory">
+            <option value="">-- Select --</option>
+            <option value="General">General</option>
+            <option value="SC">SC</option>
+            <option value="ST">ST</option>
+            <option value="OBC">OBC</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Physically Handicapped</label>
+          <select id="ddlPhysicallyHandicapped">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Enterprise Details -->
+      <div class="section-title">B. Enterprise / Business Details</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Name of Enterprise <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtEnterpriseName" type="text" placeholder="Official name of your business"/>
+            <span class="field-indicator" id="ind_enterprise_name"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Date of Incorporation / Commencement <span class="req">*</span></label>
+          <input id="txtDateOfIncorporation" type="date"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Major Activity <span class="req">*</span></label>
+          <select id="ddlMajorActivity">
+            <option value="">-- Select --</option>
+            <option value="Manufacturing">Manufacturing</option>
+            <option value="Services">Services</option>
+            <option value="Trading">Trading</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>NIC Code (National Industry Classification) <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtNICCode" type="text" placeholder="e.g. 13111 for Handloom Weaving"/>
+            <span class="field-indicator" id="ind_nic_code"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Address -->
+      <div class="section-title">C. Address of Enterprise</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>State <span class="req">*</span></label>
+          <select id="ddlState">
+            <option value="">-- Select State --</option>
+            <option>Andhra Pradesh</option>
+            <option>Assam</option>
+            <option>Bihar</option>
+            <option>Chhattisgarh</option>
+            <option>Gujarat</option>
+            <option>Haryana</option>
+            <option>Himachal Pradesh</option>
+            <option>Jharkhand</option>
+            <option>Karnataka</option>
+            <option>Kerala</option>
+            <option>Madhya Pradesh</option>
+            <option>Maharashtra</option>
+            <option>Manipur</option>
+            <option>Meghalaya</option>
+            <option>Odisha</option>
+            <option>Punjab</option>
+            <option>Rajasthan</option>
+            <option>Tamil Nadu</option>
+            <option>Telangana</option>
+            <option>Uttar Pradesh</option>
+            <option>Uttarakhand</option>
+            <option>West Bengal</option>
+            <option>Delhi</option>
+            <option>Jammu &amp; Kashmir</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>District <span class="req">*</span></label>
+          <select id="ddlDistrict">
+            <option value="">-- Select District --</option>
+            <option>Chanderi</option>
+            <option>Bhopal</option>
+            <option>Indore</option>
+            <option>Gwalior</option>
+            <option>Jabalpur</option>
+            <option>Ujjain</option>
+            <option>Sagar</option>
+            <option>Rewa</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row three">
+        <div class="form-group">
+          <label>PIN Code <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtPinCode" type="text" placeholder="6-digit PIN" maxlength="6"/>
+            <span class="field-indicator" id="ind_pin_code"></span>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Full Address</label>
+          <input id="txtAddress" type="text" placeholder="Door no., Street, Village / Town"/>
+        </div>
+      </div>
+
+      <!-- SECTION 4: Employment & Finance -->
+      <div class="section-title">D. Employment & Financial Details</div>
+
+      <div class="form-row three">
+        <div class="form-group">
+          <label>Persons Employed <span class="req">*</span></label>
+          <div class="field-wrap">
+            <input id="txtPersonsEmployed" type="number" placeholder="Total employees" min="1"/>
+            <span class="field-indicator" id="ind_persons_employed"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Investment in Plant &amp; Machinery (₹)</label>
+          <input id="txtInvestment" type="number" placeholder="Amount in rupees" min="0"/>
+        </div>
+        <div class="form-group">
+          <label>Annual Turnover (₹)</label>
+          <input id="txtTurnover" type="number" placeholder="Annual turnover" min="0"/>
+        </div>
+      </div>
+
+      <!-- SUBMIT -->
+      <div class="submit-area">
+        <label class="declaration">
+          <input type="checkbox" id="chkDeclaration" checked/>
+          I hereby declare that the information provided is true and correct to the best of my knowledge.
+          I understand that registration is a self-declaration and any misrepresentation may lead to cancellation of registration.
+        </label>
+        <button class="btn-reset" type="button" onclick="resetForm()">Reset</button>
+        <button class="btn-submit" type="button" id="btnSubmit" onclick="submitForm()">Submit Registration →</button>
+      </div>
+
+    </div><!-- /form-card -->
+
+    <!-- SUCCESS PANEL -->
+    <div class="success-panel" id="successPanel">
+      <div class="success-icon">✅</div>
+      <h3>Registration Submitted Successfully!</h3>
+      <p style="color:#555; margin-bottom:8px;">Your Udyam Registration Number is:</p>
+      <div class="udyam-number" id="udyamNumber">UDYAM-MP-12-0012345</div>
+      <p style="font-size:12px; color:#777; margin-top:8px;">
+        This number is permanent and valid for lifetime. Download your certificate below.
+      </p>
+      <br/>
+      <a class="cert-download" href="/static/demo/udyam-certificate.pdf" id="certLink">
+        ⬇ Download Udyam Certificate (PDF)
+      </a>
+    </div>
+
+  </main>
+</div>
+
+<footer class="gov-footer">
+  This portal is developed and maintained by National Informatics Centre (NIC) &nbsp;|&nbsp;
+  Content owned by Ministry of Micro, Small &amp; Medium Enterprises, Government of India &nbsp;|&nbsp;
+  <a href="#">Privacy Policy</a> &nbsp;|&nbsp; <a href="#">Terms of Use</a> &nbsp;|&nbsp;
+  Last updated: May 2025
+</footer>
+
+<script>
+  // ── Field ID → indicator mapping ──────────────────────────────────────
+  const INDICATOR_MAP = {
+    "txtOwnerName":       "ind_owner_name",
+    "txtMobile":          "ind_mobile",
+    "txtEnterpriseName":  "ind_enterprise_name",
+    "txtNICCode":         "ind_nic_code",
+    "txtPinCode":         "ind_pin_code",
+    "txtPersonsEmployed": "ind_persons_employed",
+  };
+
+  const TOTAL_FIELDS = Object.keys({
+    txtOwnerName:1, txtMobile:1, txtEnterpriseName:1,
+    ddlState:1, ddlDistrict:1, txtPinCode:1,
+    txtNICCode:1, txtPersonsEmployed:1
+  }).length;
+
+  let filledCount = 0;
+
+  function updateProgress() {
+    const pct = Math.min((filledCount / TOTAL_FIELDS) * 100, 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  // ── Playwright hook: mark field as being typed ────────────────────────
+  window.fieldStart = function(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    el.classList.remove('filled', 'error');
+    el.classList.add('typing', 'field-active');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const ind = INDICATOR_MAP[fieldId];
+    if (ind) {
+      const indEl = document.getElementById(ind);
+      if (indEl) { indEl.textContent = '✏️'; indEl.classList.add('show'); }
     }
-  </script>
+  };
+
+  // ── Playwright hook: mark field as filled ────────────────────────────
+  window.fieldFilled = function(fieldId, value) {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    el.classList.remove('typing', 'error');
+    el.classList.add('filled');
+    const ind = INDICATOR_MAP[fieldId];
+    if (ind) {
+      const indEl = document.getElementById(ind);
+      if (indEl) { indEl.textContent = '✅'; indEl.classList.add('show'); }
+    }
+    filledCount++;
+    updateProgress();
+  };
+
+  // ── Playwright hook: mark field as error ─────────────────────────────
+  window.fieldError = function(fieldId, msg) {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    el.classList.remove('typing', 'filled');
+    el.classList.add('error');
+    const ind = INDICATOR_MAP[fieldId];
+    if (ind) {
+      const indEl = document.getElementById(ind);
+      if (indEl) { indEl.textContent = '❌'; indEl.classList.add('show'); }
+    }
+  };
+
+  // ── Submit (called by Playwright or manual) ───────────────────────────
+  window.submitForm = function() {
+    document.getElementById('progressBar').style.width = '100%';
+    setTimeout(() => {
+      document.getElementById('formCard').style.display    = 'none';
+      document.getElementById('successPanel').classList.add('show');
+      document.getElementById('successPanel').scrollIntoView({ behavior: 'smooth' });
+    }, 600);
+  };
+
+  window.resetForm = function() {
+    document.querySelectorAll('input, select').forEach(el => {
+      el.value = '';
+      el.className = el.tagName === 'SELECT' ? '' : '';
+    });
+    filledCount = 0;
+    updateProgress();
+  };
+</script>
 </body>
 </html>

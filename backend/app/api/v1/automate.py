@@ -93,7 +93,7 @@ async def playwright_stream(websocket: WebSocket, job_id: str):
             pass
 
     try:
-        use_mock = settings.demo_mode or job["demo_mode"] or platform.system() == "Windows"
+        use_mock = job["demo_mode"]
         if use_mock:
             await replay_mock_events(emit)
         else:
@@ -199,7 +199,7 @@ async def catalogue_stream(websocket: WebSocket, job_id: str):
 
     except Exception as e:
         update_job(job_id, {"status": "failed"})
-        await emit({"type": "ERROR", "payload": {"message": str(e)}})
+        await emit({"type": "FATAL_ERROR", "message": str(e)})
 
     finally:
         try:
