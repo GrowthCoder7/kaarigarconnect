@@ -34,47 +34,54 @@ Rules:
 - Format dates as YYYY-MM-DD if possible.
 """
 
-async def extract_from_image(image_bytes: bytes, doc_type: str = "aadhaar") -> dict:
+async def extract_from_image(image_bytes_list: list[bytes], doc_type: str = "aadhaar") -> dict:
     """
-    Full OCR pipeline: Tesseract raw text -> Gemini structured JSON
+    Multi-page OCR pipeline with production-grade retry logic.
     """
     try:
-        image = Image.open(BytesIO(image_bytes))
-        # Hardcoded to 'eng' to avoid Windows Tesseract missing language pack crash
-        raw_text = pytesseract.image_to_string(image, lang="eng") 
+        combined_raw_text = ""
+        
+        # Loop through all uploaded images
+        for idx, img_bytes in enumerate(image_bytes_list):
+            image = Image.open(BytesIO(img_bytes))
+            raw_text = pytesseract.image_to_string(image, lang="eng")
+            combined_raw_text += f"\n--- Page {idx + 1} ---\n{raw_text}\n"
 
-        if not raw_text.strip():
+        if not combined_raw_text.strip():
             return _demo_ocr_result()
 
         prompt = EXTRACTION_PROMPT.format(
             doc_type=doc_type,
-            ocr_text=raw_text[:2000]
+            ocr_text=combined_raw_text[:4000] 
         )
         
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(max_output_tokens=1000),
-            request_options={"timeout": 30}
-        )
-        text = response.text.strip()
+        # Pro-Move: 2-Attempt Auto-Retry Loop
+        for attempt in range(2):
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.1,  # Strictly deterministic
+                        max_output_tokens=4096, # Huge buffer to prevent truncation
+                        response_mime_type="application/json"
+                    ),
+                    request_options={"timeout": 30}
+                )
+                
+                text = response.text.strip()
+                result = json.loads(text)
+                result["raw_ocr"] = combined_raw_text[:500] 
+                return result
+                
+            except json.JSONDecodeError as decode_err:
+                if attempt == 1:  # If it fails twice, give up and fall back safely
+                    print(f"[OCR Worker] LLM failed twice. Last output:\n{text}")
+                    return _demo_ocr_result()
+                print(f"[OCR Worker] Gemini truncated output. Retrying (Attempt {attempt + 1})...")
 
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-
-        result = json.loads(text.strip())
-        result["raw_ocr"] = raw_text[:500] 
-        return result
-
-    except json.JSONDecodeError:
-        print("[OCR Worker] Failed to decode JSON from LLM.")
-        return _demo_ocr_result()
     except Exception as e:
         print(f"[OCR Worker] Fatal pipeline error: {e}")
-        # raise e
-        return _demo_ocr_result()  # <-- We are forcing this to crash loudly so we can see the exact Tesseract error
-
+        return _demo_ocr_result()
 
 def categorize_ocr_result(ocr_result: dict) -> dict:
     """

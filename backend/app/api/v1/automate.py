@@ -4,7 +4,8 @@ import uuid
 import platform
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+import base64
 
 from app.agents.formfill_agent import extract_form_data
 from app.workers.playwright_worker import fill_udyam_form, replay_mock_events
@@ -16,6 +17,7 @@ from app.core.redis_client import (
     append_event, get_events,
     set_image_bytes, get_image_bytes
 )
+from app.workers.voice_worker import process_audio_chunk
 
 router = APIRouter(prefix="/automate", tags=["automation"])
 
@@ -119,11 +121,14 @@ async def playwright_stream(websocket: WebSocket, job_id: str):
 
 @router.post("/ocr")
 async def ocr_document(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),  # Notice it is now 'files' and 'List'
     doc_type: str = Form(default="aadhaar")
 ):
-    image_bytes = await file.read()
-    result = await extract_from_image(image_bytes, doc_type)
+    # Read all uploaded files into a list of bytes
+    image_bytes_list = [await f.read() for f in files]
+    
+    # Pass the entire list to the worker
+    result = await extract_from_image(image_bytes_list, doc_type)
     
     # Tri-state categorization for the frontend
     categorized = categorize_ocr_result(result)
@@ -135,7 +140,6 @@ async def ocr_document(
             "categorized": categorized
         }
     }
-
 
 # ── Catalogue: start ──────────────────────────────────────────────────
 
@@ -213,5 +217,69 @@ async def catalogue_stream(websocket: WebSocket, job_id: str):
     finally:
         try:
             await websocket.close()
+        except Exception:
+            pass
+
+# ── Voice Onboarding: Live Audio Stream ────────────────────────────────
+
+@router.websocket("/ws/onboard/voice/{artisan_id}")
+async def voice_onboarding_stream(websocket: WebSocket, artisan_id: str):
+    await websocket.accept()
+    
+    # Track the conversational memory thread just for this active websocket session
+    chat_history = []
+    current_language = "en"
+    
+    # Send an initial welcome state so the frontend knows the channel is awake
+    await websocket.send_json({
+        "type": "STATUS_UPDATE",
+        "payload": {"message": "Voice channel ready. Listening..."}
+    })
+
+    try:
+        while True:
+            # Expecting binary audio frames (WebM/Opus) coming straight from the client's microphone chunking buffer
+            data = await websocket.receive_bytes()
+            
+            if not data or len(data) < 100:
+                continue
+
+            # Notify the client that the worker has stopped listening and started crunching numbers
+            await websocket.send_json({"type": "PROCESSING", "payload": {}})
+
+            # Run through the STT -> LLM -> TTS pipeline
+            pipeline_result = await process_audio_chunk(data, chat_history,current_language)
+            
+            if pipeline_result:
+                # Append to our local in-memory thread history
+                chat_history.append({"user": pipeline_result["user_text"]})
+                chat_history.append({"ai": pipeline_result["ai_text"]})
+
+                current_language = pipeline_result.get("language_code", current_language)
+                # Encode the raw MP3 audio bytes to a browser-ready Base64 string
+                audio_base64 = base64.b64encode(pipeline_result["ai_audio_bytes"]).decode("utf-8")
+
+                # Emit the synchronized result back to Person A's UI engine
+                await websocket.send_json({
+                    "type": "SPEAKING",
+                    "payload": {
+                        "user_transcription": pipeline_result["user_text"],
+                        "ai_response_text": pipeline_result["ai_text"],
+                        "audio_data": f"data:audio/mp3;base64,{audio_base64}",
+                        "extracted_form_data": pipeline_result["extracted_data"]
+                    }
+                })
+            else:
+                await websocket.send_json({
+                    "type": "STATUS_UPDATE",
+                    "payload": {"message": "Could not clear audio layer clearly. Try again."}
+                })
+
+    except WebSocketDisconnect:
+        print(f"[Voice Stream] Artisan disconnected: {artisan_id}")
+    except Exception as e:
+        print(f"[Voice Stream] Fatal session exception: {e}")
+        try:
+            await websocket.send_json({"type": "ERROR", "payload": {"message": str(e)}})
         except Exception:
             pass

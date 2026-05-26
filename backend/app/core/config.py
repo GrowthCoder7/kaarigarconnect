@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     tesseract_path: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     demo_mode: bool = False
     demo_url: str = "http://localhost:8080/static/udyam_mock.html"
+    groq_api_key: str
 
     class Config:
         env_file = ".env"
