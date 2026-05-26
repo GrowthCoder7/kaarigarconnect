@@ -349,3 +349,18 @@ async def text_to_speech(req: TTSRequest):
         import os
         if os.path.exists(output_path):
             os.remove(output_path)
+
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, Response
+
+@router.post("/tts")
+async def text_to_speech(req: TTSRequest):
+    # ... your existing code ...
+    return StreamingResponse(
+        io.BytesIO(audio_bytes),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline; filename=speech.mp3",
+            "Access-Control-Allow-Origin": "*",   # ADD this
+        }
+    )
