@@ -17,7 +17,7 @@ from app.core.redis_client import (
     append_event, get_events,
     set_image_bytes, get_image_bytes
 )
-from app.workers.voice_worker import process_audio_chunk
+from app.workers.voice_worker import process_audio_chunk, get_initial_greeting
 
 router = APIRouter(prefix="/automate", tags=["automation"])
 
@@ -228,13 +228,34 @@ async def voice_onboarding_stream(websocket: WebSocket, artisan_id: str):
     
     # Track the conversational memory thread just for this active websocket session
     chat_history = []
-    current_language = "en"
+    current_language = "auto"
     
     # Send an initial welcome state so the frontend knows the channel is awake
     await websocket.send_json({
         "type": "STATUS_UPDATE",
         "payload": {"message": "Voice channel ready. Listening..."}
     })
+
+    try:
+        greeting = await get_initial_greeting()
+        if greeting:
+            # Save the AI's first question into the LLM's brain so it knows what it asked
+            chat_history.append({"ai": greeting["ai_text"]})
+            
+            audio_base64 = base64.b64encode(greeting["ai_audio_bytes"]).decode("utf-8")
+            
+            # Fire the payload to Person A's UI instantly
+            await websocket.send_json({
+                "type": "SPEAKING",
+                "payload": {
+                    "user_transcription": "", # No user text yet
+                    "ai_response_text": greeting["ai_text"], 
+                    "audio_data": f"data:audio/mp3;base64,{audio_base64}",
+                    "extracted_form_data": {} 
+                }
+            })
+    except Exception as e:
+        print(f"[Voice Stream] Greeting error: {e}")
 
     try:
         while True:
