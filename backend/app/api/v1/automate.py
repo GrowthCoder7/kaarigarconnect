@@ -304,3 +304,48 @@ async def voice_onboarding_stream(websocket: WebSocket, artisan_id: str):
             await websocket.send_json({"type": "ERROR", "payload": {"message": str(e)}})
         except Exception:
             pass
+
+from fastapi.responses import StreamingResponse
+import io
+
+class TTSRequest(BaseModel):
+    text: str
+    lang_code: str = "en"
+
+@router.post("/tts")
+async def text_to_speech(req: TTSRequest):
+    import edge_tts
+    
+    VOICE_MAP = {
+        "en": "en-IN-NeerjaNeural",
+        "hi": "hi-IN-SwaraNeural",
+        "ta": "ta-IN-PallaviNeural",
+        "te": "te-IN-ShrutiNeural",
+        "bn": "bn-IN-TanishaaNeural",
+        "kan": "kn-IN-SapnaNeural",  # note: guide uses 'kan', TTS uses 'kn'
+        "mr": "mr-IN-AarohiNeural",
+        "gu": "gu-IN-DhwaniNeural",
+    }
+    
+    voice = VOICE_MAP.get(req.lang_code, "en-IN-NeerjaNeural")
+    
+    # Truncate to avoid edge-tts limits
+    text = req.text[:3000]
+    
+    output_path = f"/tmp/tts_{uuid.uuid4().hex}.mp3"
+    try:
+        communicate = edge_tts.Communicate(text, voice)
+        await communicate.save(output_path)
+        
+        with open(output_path, "rb") as f:
+            audio_bytes = f.read()
+            
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": "inline; filename=speech.mp3"}
+        )
+    finally:
+        import os
+        if os.path.exists(output_path):
+            os.remove(output_path)
